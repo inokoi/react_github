@@ -1,0 +1,29 @@
+a {
+    cursor: pointer;
+}
+
+img {
+    margin-left: 20px;
+    max-width: 35px;
+}
+
+.loading {
+    display: none;
+}
+
+.form-group {
+    margin-left: 15px;
+}
+
+.panel-head {
+    padding: 15px 15px 0;
+}
+
+.form-inline {
+    margin-bottom: 15px;
+}
+
+.panel-body [class^=col-md]{
+    padding-left: 5px;
+    padding-right: 5px;
+}

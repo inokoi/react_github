@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Git search repository with React.js</title>
+    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
+    <link rel="stylesheet" href="assets/css/style.css">
+    <script src="assets/js/react-with-addons.min.js"></script>
+    <script src="assets/js/JSXTransformer.js"></script>
+    <script src="assets/js/script.js"></script>
+</head>
+<body>
+<div id="search"></div>
+<div id="repo-list"></div>
+<script type="text/jsx">
+    /** @jsx React.DOM */
+
+    var GitSearch = React.createClass({
+        getInitialState:function(){
+            return {
+                items: [
+                ]
+            }
+        },
+        handleAdd: function(name,repo,data,issues){
+            var self = this;
+            self.setState({items:[]});
+            /*var date = new Date, min = date.getMinutes(), h = date.getHours(), save_date,
+                    day = date.getDate(), m = date.getMonth(), y = date.getFullYear();
+            save_date = min + ':' + h + ' ' + day + '/' + m + '/' + y;*/
+            data = JSON.parse(data);
+            if (data.items.length > 1) {
+                data.items.map(function (item) {
+                    self.upDateState(item, issues);
+                });
+            } else {
+                self.upDateState(data.items[0], issues);
+            }
+        },
+        upDateState:function(item, issues){
+            var self = this, newItem = {id:self.state.items.length+1, issues:issues,
+                full_name:item.full_name,desc:item.description}, newState;
+            newState = self.state.items.slice(0);
+            newState.push(newItem);
+            self.setState({items:newState});
+        },
+        render:function(){
+            var url = Git.url+'search/repositories';
+            return (
+                    <div className="container">
+                        <h1>Git search repository</h1>
+                        <div className="panel panel-default">
+                            <div className="panel-head">
+                                <QueryForm addItem={this.handleAdd} url={url} />
+                            </div>
+                            <QueryRepo items={this.state.items}/>
+                        </div>
+                    </div>
+            );
+        }
+    });
+
+    var QueryForm = React.createClass({
+        getInitialState: function(){
+            return { data:{}, usename:'',name:'',repo:'' }
+        },
+        handleUseNameChange: function(e){
+            if (e.target.checked) {
+                this.setState({usename: 1});
+            } else {
+                this.setState({usename: 0});
+            }
+        },
+        handleNameChange: function(e){
+            this.setState({name: e.target.value});
+        },
+        handleRepoChange: function(e){
+            this.setState({repo: e.target.value});
+        },
+        handleSubmit:function(e){
+            e.preventDefault();
+
+            var self = this, url;
+            if(this.state.usename !== '' && this.state.name !== ''){
+                url = this.props.url+'?q=user:'+this.state.name+'+'+this.state.repo;
+            } else if (this.state.repo !== '') {
+                url = this.props.url+'?q='+this.state.repo;
+            } else {
+                alert('Please check inputs');
+            }
+
+            if(url){
+                var result = Git.ajax(url), loading;
+                result.onload = function () {
+                    var status = result.status;
+                    self.props.addItem(self.state.name, self.state.repo, this.responseText, self.props.issues);
+                    Git.load(0);
+                };
+                result.onerror = function(e){
+                    Git.load(0);
+                    alert("ERROR " + e.error);
+                };
+                result.send(null);
+                Git.load(1);
+            }
+            return false;
+        },
+
+    render: function(){
+            return(
+                    <form onSubmit={this.handleSubmit}  role="form">
+                        <div className="form-inline form-group col-md-3">
+                            <div className="input-group ">
+                                <span className="input-group-addon">
+                                    <input type="checkbox"
+                                           value={this.state.usename}
+                                           onChange={this.handleUseNameChange}
+                                           name="usename" />
+                                </span>
+                                <input className="form-control"
+                                       type="text"
+                                       name="name"
+                                       placeholder="Name user"
+                                       value={this.state.name}
+                                       onChange={this.handleNameChange} />
+                            </div>
+                        </div>
+                        <div className="form-inline">
+                            <div className="form-group">
+                                <input className="form-control"
+                                       type="text"
+                                       name="repo"
+                                       placeholder="Repository"
+                                       value={this.state.repo}
+                                       onChange={this.handleRepoChange} />
+                            </div>
+                            <div className="form-group">
+                                <button className="btn btn-primary">Поиск</button>
+                                <img src="assets/img/loading.gif" id="loading" className="loading" alt="loading"/>
+                            </div>
+                        </div>
+                    </form>
+            )
+        }
+    });
+
+    var QueryRepo = React.createClass({
+        render: function(){
+            var url, rows;
+            rows = this.props.items.map(function(item){
+                url = Git.repo+item.full_name+'/issues';
+                return <QueryRow key={item.id} date={item.date} name={item.full_name} desc={item.desc} url={url}/>
+            });
+            return (
+                <div className="panel-body">
+                    <div className="col-md-12" key="head">
+                        <div className="col-md-4 table-bordered">
+                            <div className="col-md-1">№</div>
+                            <div className="col-md-5">Full name</div>
+                            <div className="col-md-6">Description</div>
+                        </div>
+                        <div className="col-md-8 table-bordered">
+                            <div className="col-md-3">Created at</div>
+                            <div className="col-md-7">Body</div>
+                        </div>
+                    </div>
+                    {rows}
+                </div>
+            )
+        }
+    });
+
+    var QueryRow = React.createClass({
+        getInitialState: function(){
+            return { body:'',created_at:'' }
+        },
+        handleWatchIssues:function(e){
+            var self = this, url, result, data;
+            e.preventDefault();
+            url = this.props.url;
+            result = Git.ajax(url);
+            result.onload = function() {
+                if(JSON.parse(this.responseText)[0]){
+                    data = JSON.parse(this.responseText);
+                    data = data[0];
+                    if(data !== ''){
+                        self.setState({created_at:data.created_at, body:data.body});
+                    }
+                } else {
+                    alert("ERROR issues is empty");
+                }
+                Git.load(0);
+            };
+            result.onerror = function(e){
+                alert("ERROR " + e.error);
+                Git.load(0);
+            };
+            result.send(null);
+            Git.load(1);
+        },
+
+        render: function(){
+            var classes = React.addons.classSet({
+                'col-md-12': true
+            }), issues ;
+            return (
+                    <div className={classes}>
+                        <div className="col-md-4">
+                            <div className="col-md-1">{this.props.key}</div>
+                            <div className="col-md-5">
+                                <a onClick={this.handleWatchIssues}>{this.props.name}</a>
+                            </div>
+                            <div className="col-md-6">
+                                {this.props.desc}
+                            </div>
+                        </div>
+                        <QueryBodyRepo body={this.state.body} created_at={this.state.created_at}/>
+                    </div>
+            )
+        }
+    });
+
+    var QueryBodyRepo = React.createClass({
+        render:function(){
+            return(
+                    <div className="col-md-8">
+                        <div className="col-md-3" id="created_at">{this.props.created_at}</div>
+                        <div className="col-md-7" id="body_repo">{this.props.body}</div>
+                    </div>
+            )
+        }
+    });
+
+    React.renderComponent(
+            <GitSearch />,
+            document.body
+    );
+</script>
+</body>
+</html>
